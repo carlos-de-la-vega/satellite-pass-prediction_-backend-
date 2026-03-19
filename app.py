@@ -1,18 +1,21 @@
 from flask import Flask, jsonify, send_file
 from flask_cors import CORS
-from skyfield.api import load, wgs84, EarthSatellite, utc
-from datetime import datetime, timedelta
+from skyfield.api import load, wgs84, EarthSatellite
+from datetime import datetime
 import pandas as pd
 import requests
 
 app = Flask(__name__)
 CORS(app)
-CACHE = None
+
+# CACHE GLOBAL
+CACHE = []
+READY = False
 
 # ---------------- PARAMS ----------------
 LAT, LON = 41.2235594, 1.7365296
 fromDatetime = "2026-03-19T00:00:00.001Z"
-toDatetime = "2026-03-19T23:00:00.001Z"
+toDatetime = "2026-03-19T06:00:00.001Z"
 minElev = 30.0
 minDuration = 3.0
 # ----------------------------------------
@@ -29,12 +32,18 @@ def fetch_tle(norad_id):
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
-        return r.text.strip().splitlines()
+        lines = r.text.strip().splitlines()
+        if len(lines) < 3:
+            return None
+        return lines
     except Exception as e:
         print(f"Error fetching TLE {norad_id}: {e}")
         return None
 
+
 def compute_passes():
+    print("Computando pases...")
+
     start_dt = datetime.fromisoformat(fromDatetime.replace("Z", "+00:00"))
     end_dt = datetime.fromisoformat(toDatetime.replace("Z", "+00:00"))
 
@@ -45,9 +54,14 @@ def compute_passes():
     results = []
 
     for name, norad in satellites.items():
+        tle = fetch_tle(norad)
+        if tle is None:
+            continue
+
         try:
-            name_line, l1, l2 = fetch_tle(norad)
+            name_line, l1, l2 = tle
             sat = EarthSatellite(l1, l2, name, ts)
+
             t, events = sat.find_events(observer, start, end, altitude_degrees=minElev)
 
             for i in range(0, len(events), 3):
@@ -60,7 +74,9 @@ def compute_passes():
                         alt, az, _ = (sat - observer).at(culm_time).altaz()
                         elevation_deg = alt.degrees
 
-                        duration_min = (set_time.utc_datetime() - rise_time.utc_datetime()).total_seconds() / 60
+                        duration_min = (
+                            set_time.utc_datetime() - rise_time.utc_datetime()
+                        ).total_seconds() / 60
 
                         if duration_min >= minDuration:
                             results.append({
@@ -78,23 +94,40 @@ def compute_passes():
     df = pd.DataFrame(results)
     df.to_csv("satellite_passes_detailed.csv", index=False)
 
+    print("Cálculo terminado")
     return results
 
 
-# Endpoint JSON (para HTML)
+# CALCULAR AL ARRANCAR
+print("Inicializando servidor...")
+try:
+    CACHE = compute_passes()
+    READY = True
+    print("Servidor listo")
+except Exception as e:
+    print("Error inicial:", e)
+
+
+# Endpoint JSON
 @app.route("/passes")
 def get_passes():
-    global CACHE
-    if CACHE is None:
-        CACHE = compute_passes()
+    if not READY:
+        return jsonify({"status": "loading"}), 503
     return jsonify(CACHE)
 
 
-# Endpoint CSV descarga
+# Endpoint CSV
 @app.route("/download")
 def download_csv():
-    compute_passes()
+    if not READY:
+        return "Data not ready", 503
     return send_file("satellite_passes_detailed.csv", as_attachment=True)
+
+
+# Ruta base
+@app.route("/")
+def home():
+    return "API funcionando 🚀"
 
 
 if __name__ == "__main__":
