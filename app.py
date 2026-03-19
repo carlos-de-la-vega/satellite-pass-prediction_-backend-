@@ -7,6 +7,7 @@ import requests
 
 app = Flask(__name__)
 CORS(app)
+CACHE = None
 
 # ---------------- PARAMS ----------------
 LAT, LON = 41.2235594, 1.7365296
@@ -25,13 +26,17 @@ satellites = {
 
 def fetch_tle(norad_id):
     url = f"https://celestrak.com/NORAD/elements/gp.php?CATNR={norad_id}&FORMAT=TLE"
-    r = requests.get(url)
-    r.raise_for_status()
-    return r.text.strip().splitlines()
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        return r.text.strip().splitlines()
+    except Exception as e:
+        print(f"Error fetching TLE {norad_id}: {e}")
+        return None
 
 def compute_passes():
     start_dt = datetime.fromisoformat(fromDatetime.replace("Z", "+00:00"))
-    end_dt = datetime.fromisoformat(toDatetime.replace("Z", "+00:00")) + timedelta(days=1)
+    end_dt = datetime.fromisoformat(toDatetime.replace("Z", "+00:00"))
 
     start = ts.from_datetime(start_dt)
     end = ts.from_datetime(end_dt)
@@ -79,8 +84,10 @@ def compute_passes():
 # Endpoint JSON (para HTML)
 @app.route("/passes")
 def get_passes():
-    data = compute_passes()
-    return jsonify(data)
+    global CACHE
+    if CACHE is None:
+        CACHE = compute_passes()
+    return jsonify(CACHE)
 
 
 # Endpoint CSV descarga
