@@ -21,8 +21,43 @@ ts = load.timescale()
 satellites = {
     "KINEIS-1A": 60084,
     "KINEIS-1B": 60079,
-    # ... (igual que tu lista)
-    "Oceansat-3": 54361
+    "KINEIS-1C": 60081,
+    # "KINEIS-1D": 60082, # N/A
+    "KINEIS-1E": 60083,
+
+    "KINEIS-2A": 62932,
+    "KINEIS-2B": 62934,
+    "KINEIS-2C": 62929,
+    "KINEIS-2D": 62930,
+    "KINEIS-2E": 62931,
+
+    "KINEIS-3A": 61223,
+    "KINEIS-3B": 61224,
+    # "KINEIS-3C": 61220, # N/A
+    "KINEIS-3D": 61221,
+    "KINEIS-3E": 61222,
+    
+    "KINEIS-4A": 63303,
+    "KINEIS-4B": 63304,
+    # "KINEIS-4C": 63301, # N/A
+    "KINEIS-4D": 63302,
+    "KINEIS-4E": 63300,
+
+    "KINEIS-5A": 62084,
+    # "KINEIS-5B": 62085, # N/A
+    "KINEIS-5C": 62081,
+    "KINEIS-5D": 62082,
+    "KINEIS-5E": 62083,
+    #---Argos satellites---
+     # "ANGELS": 44876, # N/A
+     "Metop-B": 38771,
+     # "CS-HOPS": 54053, # N/A
+     "Metop-C": 43689,
+     # "NOAA-18": 28654, # N/A
+     # "NOAA-19": 33591, # N/A
+     "SARAL": 39086,
+     # "NOAA-15": 25338, # N/A
+     "Oceansat-3": 54361
 }
 
 def fetch_tle(norad_id):
@@ -78,14 +113,14 @@ def compute_passes():
     return results
 
 
-# 🔹 Endpoint JSON (para HTML)
+# Endpoint JSON (para HTML)
 @app.route("/passes")
 def get_passes():
     data = compute_passes()
     return jsonify(data)
 
 
-# 🔹 Endpoint CSV descarga
+# Endpoint CSV descarga
 @app.route("/download")
 def download_csv():
     compute_passes()
